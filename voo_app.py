@@ -6,6 +6,8 @@ import streamlit as st
 
 # ---- ページ設定 & ビルド時刻を表示（反映確認用） ----
 st.set_page_config(page_title="VOO 分析", layout="wide")
+st.markdown('</div>', unsafe_allow_html=True)
+
 st.caption(f"Build: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} (ローカル/Cloud反映確認用)")
 
 # ---- 軽いCSS（買値のテキストボックスを小さく目立たせない） ----
@@ -14,6 +16,19 @@ st.markdown(
     <style>
     .buy-input > div > input {max-width: 120px;}
     .small-label {font-size: 12px; color: #777; margin-bottom: 4px;}
+    /* 入力ボックスの上下余白を少し詰める */
+    div[data-baseweb="input"] { margin-bottom: 4px; }
+    /* ===== スマホ時：タイトルと上2行のレイアウト保持 ===== */
+    .metric-wrap { overflow-x: auto; padding-bottom: 6px; }
+    .metric-wrap > div[data-testid="stHorizontalBlock"] {
+        display: grid !important;
+        grid-template-columns: repeat(4, minmax(120px, 1fr));
+        column-gap: 12px; align-items: start;
+    }
+    @media (max-width: 640px) {
+      .metric-wrap > div[data-testid="stHorizontalBlock"] { min-width: 520px; }
+      .metric-wrap .stMetric { min-width: 120px; }
+    }
     </style>
     """,
     unsafe_allow_html=True,
@@ -46,6 +61,33 @@ def _to_float_or_none(s: str):
         if s == "":
             return None
         return float(s)
+    except Exception:
+        return None
+
+# 表示用フォーマッタ
+def fnum(x, digits: int = 2):
+    if x is None:
+        return "-"
+    try:
+        return f"{float(x):,.{digits}f}"
+    except Exception:
+        return "-"
+
+def fpct(p, digits: int = 2):
+    if p is None:
+        return "-"
+    try:
+        return f"{float(p):.{digits}f}%"
+    except Exception:
+        return "-"
+
+def fpct_delta(p, digits: int = 2):
+    if p is None:
+        return None
+    try:
+        val = float(p)
+        sign = "+" if val > 0 else ""  # st.metric は符号付きが色分けされる
+        return f"{sign}{val:.{digits}f}%"
     except Exception:
         return None
 
@@ -111,14 +153,17 @@ yf_period = PERIOD_OPTIONS[period_label]
 base_result = get_voo_high_low_modes(yf_period=yf_period, buy_price=None, manual_current_price=None)
 
 # ---- 1行目：最重要指標（2行目と列幅を合わせて上下を揃える：4列に統一） ----
+st.markdown('<div class="metric-wrap" id="top-row-1">', unsafe_allow_html=True)
 r1c1, r1c2, r1c3, r1c4 = st.columns([1, 1, 1, 1])
-r1c1.metric("高値（最頻）", base_result["most_frequent_high"])
-r1c2.metric("安値（最頻）", base_result["most_frequent_low"])
-r1c3.metric("値動き（率 %）", base_result["width_ratio_percent"])
+r1c1.metric("高値（最頻）", fnum(base_result["most_frequent_high"]))
+r1c2.metric("安値（最頻）", fnum(base_result["most_frequent_low"]))
+r1c3.metric("値動き（率）", fpct(base_result["width_ratio_percent"]))
 # 4列目はダミー（2行目の税引後利率に列位置を合わせるためのスペーサ）
 r1c4.write("")
+st.markdown('</div>', unsafe_allow_html=True)
 
 # ---- 2行目：試算（買値・現在値・利率・税引後利率） ----
+st.markdown('<div class="metric-wrap" id="top-row-2">', unsafe_allow_html=True)
 r2c1, r2c2, r2c3, r2c4 = st.columns(4)
 with r2c1:
     st.markdown('<div class="small-label">買値</div>', unsafe_allow_html=True)
@@ -136,10 +181,10 @@ buy_price_val = _to_float_or_none(buy_price_str)
 # 買値を反映して再計算（現在価格入力は撤去し、自動の終値を使用）
 result = get_voo_high_low_modes(yf_period=yf_period, buy_price=buy_price_val, manual_current_price=None)
 
-r2c1.metric("買値", "-" if result["buy_price"] is None else result["buy_price"])
-r2c2.metric("現在価格", result["current_price"])
-r2c3.metric("利率 (%)", "-" if result["profit_percent"] is None else result["profit_percent"])
-r2c4.metric("税引後利率 (%)", "-" if result["tax_profit_percent"] is None else result["tax_profit_percent"])
+r2c1.metric("買値", fnum(result["buy_price"]))
+r2c2.metric("現在価格", fnum(result["current_price"]))
+r2c3.metric("利率", fpct(result["profit_percent"]), delta=fpct_delta(result["profit_percent"]))
+r2c4.metric("税引後利率", fpct(result["tax_profit_percent"]), delta=fpct_delta(result["tax_profit_percent"]))
 
 st.caption("※ 税引後利率は米国ETFを特定口座で売買した場合（概算 20.315%）で計算しています。買値を入れると自動で計算されます。")
 
