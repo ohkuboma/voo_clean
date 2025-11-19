@@ -21,13 +21,25 @@ st.markdown(
     .sticky-row { background: var(--background-color, #FFFFFF); }
     .sticky-row .scroll-x { overflow-x: auto; -webkit-overflow-scrolling: touch; }
     .sticky-row .scroll-x > div[data-testid="stHorizontalBlock"] {
-        display: grid !important;
-        grid-template-columns: repeat(4, minmax(140px, 1fr));
-        column-gap: 12px; align-items: start;
+        display: block !important; /* columnsの自動縦積みを無効化 */
     }
 
     @media (max-width: 640px) {
       #sticky-head { position: sticky; top: 0; z-index: 1000; background: var(--background-color, #FFFFFF); padding: 4px 0; box-shadow: 0 1px 0 rgba(0,0,0,0.04); }
+      #top-row-1 { position: sticky; top: 56px; z-index: 999; padding: 6px 0; box-shadow: 0 1px 0 rgba(0,0,0,0.03); }
+      #top-row-2 { position: sticky; top: 118px; z-index: 998; padding: 6px 0; box-shadow: 0 1px 0 rgba(0,0,0,0.02); }
+      .sticky-row .scroll-x { overflow-x: auto; -webkit-overflow-scrolling: touch; white-space: nowrap; }
+      /* 各colを横並びに固定 */
+      .sticky-row .scroll-x div[data-testid='column'] {
+        display: inline-block !important;
+        vertical-align: top;
+        width: auto !important;
+        min-width: 140px;
+        margin-right: 12px;
+      }
+      /* metric自体の幅を広がりすぎないように */
+      .sticky-row .scroll-x .stMetric { width: auto; min-width: 140px; }
+    }
       #top-row-1 { position: sticky; top: 56px; z-index: 999; padding: 6px 0; box-shadow: 0 1px 0 rgba(0,0,0,0.03); }
       #top-row-2 { position: sticky; top: 118px; z-index: 998; padding: 6px 0; box-shadow: 0 1px 0 rgba(0,0,0,0.02); }
       .sticky-row .scroll-x > div[data-testid="stHorizontalBlock"] { min-width: 560px; }
