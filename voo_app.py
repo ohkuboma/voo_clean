@@ -29,6 +29,12 @@ st.markdown(
       .metric-wrap > div[data-testid="stHorizontalBlock"] { min-width: 520px; }
       .metric-wrap .stMetric { min-width: 120px; }
     }
+    /* ===== スマホ：上ヘッダを固定（タイトル＋上2行） ===== */
+    @media (max-width: 640px) {
+      #sticky-head { position: sticky; top: 0; z-index: 1000; background: var(--background-color, #FFFFFF); padding: 4px 0; box-shadow: 0 1px 0 rgba(0,0,0,0.04); }
+      #top-row-1 { position: sticky; top: 56px; z-index: 999; background: var(--background-color, #FFFFFF); padding: 4px 0; box-shadow: 0 1px 0 rgba(0,0,0,0.03); }
+      #top-row-2 { position: sticky; top: 118px; z-index: 998; background: var(--background-color, #FFFFFF); padding: 4px 0; box-shadow: 0 1px 0 rgba(0,0,0,0.02); }
+    }
     </style>
     """,
     unsafe_allow_html=True,
@@ -52,7 +58,8 @@ with sel_col2:
     st.empty()
 
 # タイトルは選択期間に合わせて変更
-st.title(f"VOO {period_label} 分析アプリ")
+# タイトルをHTMLで出してスマホ時にsticky化
+st.markdown(f"<div id='sticky-head'><h1>VOO {period_label} 分析アプリ</h1></div>", unsafe_allow_html=True)
 
 # ---- ユーティリティ ----
 def _to_float_or_none(s: str):
