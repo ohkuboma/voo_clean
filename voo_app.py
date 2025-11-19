@@ -5,8 +5,7 @@ import yfinance as yf
 import streamlit as st
 
 # ---- ページ設定 & ビルド時刻を表示（反映確認用） ----
-st.set_page_config(page_title="VOO 30日分析", layout="wide")
-st.title("VOO 30日分析アプリ")
+st.set_page_config(page_title="VOO 分析", layout="wide")
 st.caption(f"Build: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} (ローカル/Cloud反映確認用)")
 
 # ---- 軽いCSS（買値のテキストボックスを小さく目立たせない） ----
@@ -20,6 +19,26 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+# ---- 期間選択（プルダウン） ----
+PERIOD_OPTIONS = {
+    "1週間": "7d",
+    "1か月": "1mo",
+    "3か月": "3mo",
+    "6か月": "6mo",
+    "1年": "1y",
+    "5年": "5y",
+}
+
+# 期間セレクタは控えめに左上に表示
+sel_col1, sel_col2 = st.columns([1, 3])
+with sel_col1:
+    period_label = st.selectbox("期間", list(PERIOD_OPTIONS.keys()), index=1)
+with sel_col2:
+    st.empty()
+
+# タイトルは選択期間に合わせて変更
+st.title(f"VOO {period_label} 分析アプリ")
+
 # ---- ユーティリティ ----
 def _to_float_or_none(s: str):
     try:
@@ -31,18 +50,19 @@ def _to_float_or_none(s: str):
         return None
 
 # ---- データ取得 ----
-def load_voo_data():
+def load_voo_data(yf_period: str):
     ticker = yf.Ticker("VOO")
-    df = ticker.history(period="2mo")
+    # 期間はセレクタから渡す。日足で取得
+    df = ticker.history(period=yf_period, interval="1d")
     if df.empty:
         st.error("VOOのデータが取得できませんでした。")
         st.stop()
-    df = df.tail(30).reset_index()
+    df = df.reset_index()
     return df[["Date", "High", "Low", "Close"]]
 
 # ---- 集計ロジック ----
-def get_voo_high_low_modes(buy_price=None, manual_current_price=None):
-    df = load_voo_data()
+def get_voo_high_low_modes(yf_period: str, buy_price=None, manual_current_price=None):
+    df = load_voo_data(yf_period)
     highs = df["High"].round(2).tolist()
     lows = df["Low"].round(2).tolist()
 
@@ -84,11 +104,11 @@ def get_voo_high_low_modes(buy_price=None, manual_current_price=None):
         "df": df,
     }
 
-# ---- まず集計（最重要の上段を先に描画） ----
-# 買値入力はこの後で反映させる（上段の邪魔をしない）
-base_result = get_voo_high_low_modes(buy_price=None, manual_current_price=None)
+# ---- 最重要の上段を先に描画（選択期間で集計） ----
+yf_period = PERIOD_OPTIONS[period_label]
+base_result = get_voo_high_low_modes(yf_period=yf_period, buy_price=None, manual_current_price=None)
 
-# ---- 1行目：最重要指標（赤枠の位置） ----
+# ---- 1行目：最重要指標 ----
 r1c1, r1c2, r1c3 = st.columns(3)
 r1c1.metric("高値（最頻）", base_result["most_frequent_high"])
 r1c2.metric("安値（最頻）", base_result["most_frequent_low"])
@@ -105,13 +125,12 @@ with r2c1:
         label_visibility="collapsed",
         key="buy_input",
     )
-    # CSSで幅を絞る
     st.markdown("<div class='buy-input'></div>", unsafe_allow_html=True)
 
 buy_price_val = _to_float_or_none(buy_price_str)
 
 # 買値を反映して再計算（現在価格入力は撤去し、自動の終値を使用）
-result = get_voo_high_low_modes(buy_price=buy_price_val, manual_current_price=None)
+result = get_voo_high_low_modes(yf_period=yf_period, buy_price=buy_price_val, manual_current_price=None)
 
 r2c1.metric("買値", "-" if result["buy_price"] is None else result["buy_price"])
 r2c2.metric("現在価格", result["current_price"])
@@ -127,5 +146,5 @@ st.write(result["min_range_day"].to_frame().T)
 st.subheader("📈 値幅の割合が最も大きい日")
 st.write(result["max_range_day"].to_frame().T)
 
-st.subheader("📋 30営業日のデータ一覧")
+st.subheader("📋 データ一覧（選択期間）")
 st.dataframe(result["df"], use_container_width=True)
