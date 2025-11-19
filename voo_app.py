@@ -6,7 +6,6 @@ import streamlit as st
 
 # ---- ページ設定 & ビルド時刻を表示（反映確認用） ----
 st.set_page_config(page_title="VOO 分析", layout="wide")
-st.markdown('</div>', unsafe_allow_html=True)
 
 st.caption(f"Build: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} (ローカル/Cloud反映確認用)")
 
@@ -16,24 +15,22 @@ st.markdown(
     <style>
     .buy-input > div > input {max-width: 120px;}
     .small-label {font-size: 12px; color: #777; margin-bottom: 4px;}
-    /* 入力ボックスの上下余白を少し詰める */
     div[data-baseweb="input"] { margin-bottom: 4px; }
-    /* ===== スマホ時：タイトルと上2行のレイアウト保持 ===== */
-    .metric-wrap { overflow-x: auto; padding-bottom: 6px; }
-    .metric-wrap > div[data-testid="stHorizontalBlock"] {
+
+    /* === 共通：モバイル最適化（横スクロール・固定） === */
+    .sticky-row { background: var(--background-color, #FFFFFF); }
+    .sticky-row .scroll-x { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .sticky-row .scroll-x > div[data-testid="stHorizontalBlock"] {
         display: grid !important;
-        grid-template-columns: repeat(4, minmax(120px, 1fr));
+        grid-template-columns: repeat(4, minmax(140px, 1fr));
         column-gap: 12px; align-items: start;
     }
-    @media (max-width: 640px) {
-      .metric-wrap > div[data-testid="stHorizontalBlock"] { min-width: 520px; }
-      .metric-wrap .stMetric { min-width: 120px; }
-    }
-    /* ===== スマホ：上ヘッダを固定（タイトル＋上2行） ===== */
+
     @media (max-width: 640px) {
       #sticky-head { position: sticky; top: 0; z-index: 1000; background: var(--background-color, #FFFFFF); padding: 4px 0; box-shadow: 0 1px 0 rgba(0,0,0,0.04); }
-      #top-row-1 { position: sticky; top: 56px; z-index: 999; background: var(--background-color, #FFFFFF); padding: 4px 0; box-shadow: 0 1px 0 rgba(0,0,0,0.03); }
-      #top-row-2 { position: sticky; top: 118px; z-index: 998; background: var(--background-color, #FFFFFF); padding: 4px 0; box-shadow: 0 1px 0 rgba(0,0,0,0.02); }
+      #top-row-1 { position: sticky; top: 56px; z-index: 999; padding: 6px 0; box-shadow: 0 1px 0 rgba(0,0,0,0.03); }
+      #top-row-2 { position: sticky; top: 118px; z-index: 998; padding: 6px 0; box-shadow: 0 1px 0 rgba(0,0,0,0.02); }
+      .sticky-row .scroll-x > div[data-testid="stHorizontalBlock"] { min-width: 560px; }
     }
     </style>
     """,
@@ -160,17 +157,17 @@ yf_period = PERIOD_OPTIONS[period_label]
 base_result = get_voo_high_low_modes(yf_period=yf_period, buy_price=None, manual_current_price=None)
 
 # ---- 1行目：最重要指標（2行目と列幅を合わせて上下を揃える：4列に統一） ----
-st.markdown('<div class="metric-wrap" id="top-row-1">', unsafe_allow_html=True)
+st.markdown('<div class="sticky-row" id="top-row-1"><div class="scroll-x">', unsafe_allow_html=True)
 r1c1, r1c2, r1c3, r1c4 = st.columns([1, 1, 1, 1])
 r1c1.metric("高値（最頻）", fnum(base_result["most_frequent_high"]))
 r1c2.metric("安値（最頻）", fnum(base_result["most_frequent_low"]))
 r1c3.metric("値動き（率）", fpct(base_result["width_ratio_percent"]))
 # 4列目はダミー（2行目の税引後利率に列位置を合わせるためのスペーサ）
 r1c4.write("")
-st.markdown('</div>', unsafe_allow_html=True)
+st.markdown('</div></div>', unsafe_allow_html=True)
 
 # ---- 2行目：試算（買値・現在値・利率・税引後利率） ----
-st.markdown('<div class="metric-wrap" id="top-row-2">', unsafe_allow_html=True)
+st.markdown('<div class="sticky-row" id="top-row-2"><div class="scroll-x">', unsafe_allow_html=True)
 r2c1, r2c2, r2c3, r2c4 = st.columns(4)
 with r2c1:
     st.markdown('<div class="small-label">買値</div>', unsafe_allow_html=True)
