@@ -63,37 +63,39 @@ def load_voo_data(yf_period: str):
 # ---- 集計ロジック ----
 def get_voo_high_low_modes(yf_period: str, buy_price=None, manual_current_price=None):
     df = load_voo_data(yf_period)
-    highs = df["High"].round(2).tolist()
-    lows = df["Low"].round(2).tolist()
+    hs = df["High"].astype(float)
+    ls = df["Low"].astype(float)
 
-    try:
-        high_mode = mode(highs)
-    except Exception:
-        high_mode = max(set(highs), key=highs.count)
+    # 箱ひげ図の太い部分(IQR)で代表値を出す
+    h_q1, h_q3 = hs.quantile(0.25), hs.quantile(0.75)
+    l_q1, l_q3 = ls.quantile(0.25), ls.quantile(0.75)
 
-    try:
-        low_mode = mode(lows)
-    except Exception:
-        low_mode = max(set(lows), key=lows.count)
+    high_rep = round(h_q3, 2)  # High: 箱の上端(Q3)
+    low_rep  = round(l_q1, 2)  # Low : 箱の下端(Q1)
 
-    width_ratio = round((high_mode - low_mode) / low_mode * 100, 2)
+    # 万一の逆転を防止
+    if low_rep > high_rep:
+        mid = round((low_rep + high_rep) / 2, 2)
+        low_rep, high_rep = mid, mid
 
+    width_ratio = round((high_rep - low_rep) / low_rep * 100, 2) if low_rep != 0 else 0.0
+
+    # 参考: 日別の値幅比で最小/最大日
     df["RangeRatio"] = ((df["High"] - df["Low"]) / df["Low"] * 100).round(2)
     min_row = df.loc[df["RangeRatio"].idxmin()]
     max_row = df.loc[df["RangeRatio"].idxmax()]
 
-    current_price = manual_current_price if manual_current_price is not None else df.iloc[-1]["Close"]
+    current_price = manual_current_price if manual_current_price is not None else float(df.iloc[-1]["Close"])
 
     profit_percent = None
     tax_profit_percent = None
     if buy_price is not None and buy_price > 0:
         profit_percent = round((current_price - buy_price) / buy_price * 100, 2)
-        # 日本の特定口座で米国ETF譲渡益課税（概ね 20.315%）→ 手取りは約 79.685%
         tax_profit_percent = round(profit_percent * 0.79685, 2)
 
     return {
-        "most_frequent_high": round(high_mode, 2),
-        "most_frequent_low": round(low_mode, 2),
+        "most_frequent_high": high_rep,
+        "most_frequent_low": low_rep,
         "width_ratio_percent": width_ratio,
         "min_range_day": min_row,
         "max_range_day": max_row,
