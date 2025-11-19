@@ -73,18 +73,20 @@ if st.button("計算する"):
 
     # 最上段メトリクス（最頻高値・最頻安値・値幅割合）
     col1, col2, col3 = st.columns(3)
-    col1.metric("最頻高値", result['most_frequent_high'])
-    col2.metric("最頻安値", result['most_frequent_low'])
-    col3.metric("値幅割合 (%)", result['width_ratio_percent'])
+    col1.metric("高値（最頻）", result['most_frequent_high'])
+    col2.metric("安値（最頻）", result['most_frequent_low'])
+    col3.metric("値動き（率 %）", result['width_ratio_percent'])
 
     # 2段目メトリクス（買値・現在価格・利益率・税引後利益率）
     col4, col5, col6, col7 = st.columns(4)
     col4.metric("買値", result['buy_price'])
     col5.metric("現在価格", round(result['current_price'], 2))
     if result['profit_percent'] is not None:
-        col6.metric("予想利益率 (%)", result['profit_percent'])
+        col6.metric("利率 (%)", result['profit_percent'])
     if result['tax_profit_percent'] is not None:
-        col7.metric("税引後利益率 (%)", result['tax_profit_percent'])
+        col7.metric("税引後利率 (%)", result['tax_profit_percent'])
+
+    st.caption("※ 税引後利率は米国ETFを特定口座で売買した場合で計算")
 
     st.subheader("📉 値幅の割合が最も小さい日")
     st.write(result['min_range_day'].to_frame().T)
