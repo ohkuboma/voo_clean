@@ -14,7 +14,7 @@ def load_voo_data():
     return df[['Date', 'High', 'Low', 'Close']]
 
 # 最頻高値・安値を求める関数
-def get_voo_high_low_modes(buy_price=None):
+def get_voo_high_low_modes(buy_price=None, manual_current_price=None):
     df = load_voo_data()
     highs = df['High'].round(2).tolist()
     lows = df['Low'].round(2).tolist()
@@ -35,14 +35,14 @@ def get_voo_high_low_modes(buy_price=None):
     min_row = df.loc[df['RangeRatio'].idxmin()]
     max_row = df.loc[df['RangeRatio'].idxmax()]
 
-    current_price = df.iloc[-1]['Close']
+    current_price = manual_current_price if manual_current_price is not None else df.iloc[-1]['Close']
 
     profit_percent = None
     tax_profit_percent = None
     if buy_price is not None:
         try:
             profit_percent = round((current_price - buy_price) / buy_price * 100, 2)
-            tax_profit_percent = round(profit_percent * 0.8, 2)  # 仮に20%課税
+            tax_profit_percent = round(profit_percent * 0.79685, 2)  # 米国ETF（特定口座）課税後
         except ZeroDivisionError:
             st.error("買値が0のため利益計算できませんでした。")
 
@@ -62,10 +62,14 @@ def get_voo_high_low_modes(buy_price=None):
 # Streamlit アプリ
 st.title("VOO 30日分析アプリ")
 
-buy_price_input = st.number_input("買値を入力してください", min_value=0.0, step=0.1, value=600.0)
+col_input1, col_input2 = st.columns([1, 1])
+with col_input1:
+    buy_price_input = st.number_input("買値を入力してください", min_value=0.0, step=0.1, value=600.0)
+with col_input2:
+    manual_current_price = st.number_input("現在価格を入力（任意）", min_value=0.0, step=0.1)
 
 if st.button("計算する"):
-    result = get_voo_high_low_modes(buy_price=buy_price_input)
+    result = get_voo_high_low_modes(buy_price=buy_price_input, manual_current_price=manual_current_price or None)
 
     # 最上段メトリクス（最頻高値・最頻安値・値幅割合）
     col1, col2, col3 = st.columns(3)
@@ -73,7 +77,7 @@ if st.button("計算する"):
     col2.metric("最頻安値", result['most_frequent_low'])
     col3.metric("値幅割合 (%)", result['width_ratio_percent'])
 
-    # 下段メトリクス（買値・現在価格・利益率・税引後利益率）
+    # 2段目メトリクス（買値・現在価格・利益率・税引後利益率）
     col4, col5, col6, col7 = st.columns(4)
     col4.metric("買値", result['buy_price'])
     col5.metric("現在価格", round(result['current_price'], 2))
