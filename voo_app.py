@@ -1,9 +1,25 @@
 import pandas as pd
 from statistics import mode
+from datetime import datetime
 import yfinance as yf
 import streamlit as st
 
-# VOO実データ読み込み関数（過去30営業日）
+# ---- ページ設定 & ビルド時刻を表示（反映確認用） ----
+st.set_page_config(page_title="VOO 30日分析", layout="wide")
+st.title("VOO 30日分析アプリ")
+st.caption(f"Build: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} (ローカル/Cloud反映確認用)")
+
+# ---- ユーティリティ ----
+def _to_float_or_none(s: str):
+    try:
+        s = s.strip()
+        if s == "":
+            return None
+        return float(s)
+    except Exception:
+        return None
+
+# ---- データ取得 ----
 def load_voo_data():
     ticker = yf.Ticker("VOO")
     df = ticker.history(period="2mo")
@@ -11,88 +27,109 @@ def load_voo_data():
         st.error("VOOのデータが取得できませんでした。")
         st.stop()
     df = df.tail(30).reset_index()
-    return df[['Date', 'High', 'Low', 'Close']]
+    return df[["Date", "High", "Low", "Close"]]
 
-# 最頻高値・安値を求める関数
+# ---- 集計ロジック ----
 def get_voo_high_low_modes(buy_price=None, manual_current_price=None):
     df = load_voo_data()
-    highs = df['High'].round(2).tolist()
-    lows = df['Low'].round(2).tolist()
+    highs = df["High"].round(2).tolist()
+    lows = df["Low"].round(2).tolist()
 
     try:
         high_mode = mode(highs)
-    except:
+    except Exception:
         high_mode = max(set(highs), key=highs.count)
 
     try:
         low_mode = mode(lows)
-    except:
+    except Exception:
         low_mode = max(set(lows), key=lows.count)
 
     width_ratio = round((high_mode - low_mode) / low_mode * 100, 2)
 
-    df['RangeRatio'] = ((df['High'] - df['Low']) / df['Low'] * 100).round(2)
-    min_row = df.loc[df['RangeRatio'].idxmin()]
-    max_row = df.loc[df['RangeRatio'].idxmax()]
+    df["RangeRatio"] = ((df["High"] - df["Low"]) / df["Low"] * 100).round(2)
+    min_row = df.loc[df["RangeRatio"].idxmin()]
+    max_row = df.loc[df["RangeRatio"].idxmax()]
 
-    current_price = manual_current_price if manual_current_price is not None else df.iloc[-1]['Close']
+    current_price = manual_current_price if manual_current_price is not None else df.iloc[-1]["Close"]
 
     profit_percent = None
     tax_profit_percent = None
-    if buy_price is not None:
-        try:
-            profit_percent = round((current_price - buy_price) / buy_price * 100, 2)
-            tax_profit_percent = round(profit_percent * 0.79685, 2)  # 米国ETF（特定口座）課税後
-        except ZeroDivisionError:
-            st.error("買値が0のため利益計算できませんでした。")
+    if buy_price is not None and buy_price > 0:
+        profit_percent = round((current_price - buy_price) / buy_price * 100, 2)
+        # 日本の特定口座で米国ETF譲渡益課税（概ね 20.315%）→ 手取りは約 79.685%
+        tax_profit_percent = round(profit_percent * 0.79685, 2)
 
     return {
-        'most_frequent_high': high_mode,
-        'most_frequent_low': low_mode,
-        'width_ratio_percent': width_ratio,
-        'min_range_day': min_row,
-        'max_range_day': max_row,
-        'current_price': current_price,
-        'buy_price': buy_price,
-        'profit_percent': profit_percent,
-        'tax_profit_percent': tax_profit_percent,
-        'df': df
+        "most_frequent_high": round(high_mode, 2),
+        "most_frequent_low": round(low_mode, 2),
+        "width_ratio_percent": width_ratio,
+        "min_range_day": min_row,
+        "max_range_day": max_row,
+        "current_price": round(float(current_price), 2),
+        "buy_price": None if buy_price is None else round(float(buy_price), 2),
+        "profit_percent": profit_percent,
+        "tax_profit_percent": tax_profit_percent,
+        "df": df,
     }
 
-# Streamlit アプリ
-st.title("VOO 30日分析アプリ")
+# ---- 入力フォーム（小さなテキストボックス） ----
+with st.form("inputs"):
+    c1, c2 = st.columns([1, 1])
+    with c1:
+        buy_price_str = st.text_input("買値", value="", placeholder="例: 600")
+    with c2:
+        manual_current_price_str = st.text_input("現在価格（任意）", value="", placeholder="例: 615")
+    submitted = st.form_submit_button("計算する")
 
-col_input1, col_input2 = st.columns([1, 1])
-with col_input1:
-    buy_price_input = st.number_input("買値を入力してください", min_value=0.0, step=0.1, value=600.0)
-with col_input2:
-    manual_current_price = st.number_input("現在価格を入力（任意）", min_value=0.0, step=0.1)
+if submitted:
+    buy_price_val = _to_float_or_none(buy_price_str)
+    manual_current_price_val = _to_float_or_none(manual_current_price_str)
 
-if st.button("計算する"):
-    result = get_voo_high_low_modes(buy_price=buy_price_input, manual_current_price=manual_current_price or None)
+    if buy_price_str != "" and buy_price_val is None:
+        st.warning("買値が数値として解釈できませんでした。半角数字で入力してください。")
+    if manual_current_price_str != "" and manual_current_price_val is None:
+        st.warning("現在価格が数値として解釈できませんでした。半角数字で入力してください。")
 
-    # 最上段メトリクス（最頻高値・最頻安値・値幅割合）
-    col1, col2, col3 = st.columns(3)
-    col1.metric("高値（最頻）", result['most_frequent_high'])
-    col2.metric("安値（最頻）", result['most_frequent_low'])
-    col3.metric("値動き（率 %）", result['width_ratio_percent'])
+    result = get_voo_high_low_modes(
+        buy_price=buy_price_val,
+        manual_current_price=manual_current_price_val,
+    )
 
-    # 2段目メトリクス（買値・現在価格・利益率・税引後利益率）
-    col4, col5, col6, col7 = st.columns(4)
-    col4.metric("買値", result['buy_price'])
-    col5.metric("現在価格", round(result['current_price'], 2))
-    if result['profit_percent'] is not None:
-        col6.metric("利率 (%)", result['profit_percent'])
-    if result['tax_profit_percent'] is not None:
-        col7.metric("税引後利率 (%)", result['tax_profit_percent'])
+    # ---- 1行目：高値(最頻) / 低値(最頻) / 値動き(率) ----
+    r1c1, r1c2, r1c3 = st.columns(3)
+    r1c1.metric("高値（最頻）", result["most_frequent_high"])
+    r1c2.metric("安値（最頻）", result["most_frequent_low"])
+    r1c3.metric("値動き（率 %）", result["width_ratio_percent"])
 
-    st.caption("※ 税引後利率は米国ETFを特定口座で売買した場合で計算")
+    # ---- 2行目：買値 / 現在値 / 利率 / 税引後利率 ----
+    r2c1, r2c2, r2c3, r2c4 = st.columns(4)
+    r2c1.metric("買値", "-" if result["buy_price"] is None else result["buy_price"])
+    r2c2.metric("現在価格", result["current_price"])
+    r2c3.metric("利率 (%)", "-" if result["profit_percent"] is None else result["profit_percent"])
+    r2c4.metric("税引後利率 (%)", "-" if result["tax_profit_percent"] is None else result["tax_profit_percent"])
+
+    st.caption("※ 税引後利率は米国ETFを特定口座で売買した場合（概算 20.315%）で計算しています。")
 
     st.subheader("📉 値幅の割合が最も小さい日")
-    st.write(result['min_range_day'].to_frame().T)
+    st.write(result["min_range_day"].to_frame().T)
 
     st.subheader("📈 値幅の割合が最も大きい日")
-    st.write(result['max_range_day'].to_frame().T)
+    st.write(result["max_range_day"].to_frame().T)
 
     st.subheader("📋 30営業日のデータ一覧")
-    st.dataframe(result['df'])
+    st.dataframe(result["df"], use_container_width=True)
+else:
+    # まだ計算前でもレイアウトの雛形が見えるようにプレースホルダを出す
+    ph1, ph2, ph3 = st.columns(3)
+    ph1.metric("高値（最頻）", "-")
+    ph2.metric("安値（最頻）", "-")
+    ph3.metric("値動き（率 %）", "-")
+
+    ph4, ph5, ph6, ph7 = st.columns(4)
+    ph4.metric("買値", "-")
+    ph5.metric("現在価格", "-")
+    ph6.metric("利率 (%)", "-")
+    ph7.metric("税引後利率 (%)", "-")
+
+    st.caption("※ 上のフォームで値を入れて『計算する』を押すと、最新の結果が表示されます。")
