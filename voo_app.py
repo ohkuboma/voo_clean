@@ -9,6 +9,17 @@ st.set_page_config(page_title="VOO 30日分析", layout="wide")
 st.title("VOO 30日分析アプリ")
 st.caption(f"Build: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} (ローカル/Cloud反映確認用)")
 
+# ---- 軽いCSS（買値のテキストボックスを小さく目立たせない） ----
+st.markdown(
+    """
+    <style>
+    .buy-input > div > input {max-width: 120px;}
+    .small-label {font-size: 12px; color: #777; margin-bottom: 4px;}
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 # ---- ユーティリティ ----
 def _to_float_or_none(s: str):
     try:
@@ -73,63 +84,48 @@ def get_voo_high_low_modes(buy_price=None, manual_current_price=None):
         "df": df,
     }
 
-# ---- 入力フォーム（小さなテキストボックス） ----
-with st.form("inputs"):
-    c1, c2 = st.columns([1, 1])
-    with c1:
-        buy_price_str = st.text_input("買値", value="", placeholder="例: 600")
-    with c2:
-        manual_current_price_str = st.text_input("現在価格（任意）", value="", placeholder="例: 615")
-    submitted = st.form_submit_button("計算する")
+# ---- まず集計（最重要の上段を先に描画） ----
+# 買値入力はこの後で反映させる（上段の邪魔をしない）
+base_result = get_voo_high_low_modes(buy_price=None, manual_current_price=None)
 
-if submitted:
-    buy_price_val = _to_float_or_none(buy_price_str)
-    manual_current_price_val = _to_float_or_none(manual_current_price_str)
+# ---- 1行目：最重要指標（赤枠の位置） ----
+r1c1, r1c2, r1c3 = st.columns(3)
+r1c1.metric("高値（最頻）", base_result["most_frequent_high"])
+r1c2.metric("安値（最頻）", base_result["most_frequent_low"])
+r1c3.metric("値動き（率 %）", base_result["width_ratio_percent"])
 
-    if buy_price_str != "" and buy_price_val is None:
-        st.warning("買値が数値として解釈できませんでした。半角数字で入力してください。")
-    if manual_current_price_str != "" and manual_current_price_val is None:
-        st.warning("現在価格が数値として解釈できませんでした。半角数字で入力してください。")
-
-    result = get_voo_high_low_modes(
-        buy_price=buy_price_val,
-        manual_current_price=manual_current_price_val,
+# ---- 2行目：試算（買値・現在値・利率・税引後利率） ----
+r2c1, r2c2, r2c3, r2c4 = st.columns(4)
+with r2c1:
+    st.markdown('<div class="small-label">買値</div>', unsafe_allow_html=True)
+    buy_price_str = st.text_input(
+        label="買値入力",
+        value="",
+        placeholder="例: 600",
+        label_visibility="collapsed",
+        key="buy_input",
     )
+    # CSSで幅を絞る
+    st.markdown("<div class='buy-input'></div>", unsafe_allow_html=True)
 
-    # ---- 1行目：高値(最頻) / 低値(最頻) / 値動き(率) ----
-    r1c1, r1c2, r1c3 = st.columns(3)
-    r1c1.metric("高値（最頻）", result["most_frequent_high"])
-    r1c2.metric("安値（最頻）", result["most_frequent_low"])
-    r1c3.metric("値動き（率 %）", result["width_ratio_percent"])
+buy_price_val = _to_float_or_none(buy_price_str)
 
-    # ---- 2行目：買値 / 現在値 / 利率 / 税引後利率 ----
-    r2c1, r2c2, r2c3, r2c4 = st.columns(4)
-    r2c1.metric("買値", "-" if result["buy_price"] is None else result["buy_price"])
-    r2c2.metric("現在価格", result["current_price"])
-    r2c3.metric("利率 (%)", "-" if result["profit_percent"] is None else result["profit_percent"])
-    r2c4.metric("税引後利率 (%)", "-" if result["tax_profit_percent"] is None else result["tax_profit_percent"])
+# 買値を反映して再計算（現在価格入力は撤去し、自動の終値を使用）
+result = get_voo_high_low_modes(buy_price=buy_price_val, manual_current_price=None)
 
-    st.caption("※ 税引後利率は米国ETFを特定口座で売買した場合（概算 20.315%）で計算しています。")
+r2c1.metric("買値", "-" if result["buy_price"] is None else result["buy_price"])
+r2c2.metric("現在価格", result["current_price"])
+r2c3.metric("利率 (%)", "-" if result["profit_percent"] is None else result["profit_percent"])
+r2c4.metric("税引後利率 (%)", "-" if result["tax_profit_percent"] is None else result["tax_profit_percent"])
 
-    st.subheader("📉 値幅の割合が最も小さい日")
-    st.write(result["min_range_day"].to_frame().T)
+st.caption("※ 税引後利率は米国ETFを特定口座で売買した場合（概算 20.315%）で計算しています。買値を入れると自動で計算されます。")
 
-    st.subheader("📈 値幅の割合が最も大きい日")
-    st.write(result["max_range_day"].to_frame().T)
+# ---- 以下、詳細テーブル ----
+st.subheader("📉 値幅の割合が最も小さい日")
+st.write(result["min_range_day"].to_frame().T)
 
-    st.subheader("📋 30営業日のデータ一覧")
-    st.dataframe(result["df"], use_container_width=True)
-else:
-    # まだ計算前でもレイアウトの雛形が見えるようにプレースホルダを出す
-    ph1, ph2, ph3 = st.columns(3)
-    ph1.metric("高値（最頻）", "-")
-    ph2.metric("安値（最頻）", "-")
-    ph3.metric("値動き（率 %）", "-")
+st.subheader("📈 値幅の割合が最も大きい日")
+st.write(result["max_range_day"].to_frame().T)
 
-    ph4, ph5, ph6, ph7 = st.columns(4)
-    ph4.metric("買値", "-")
-    ph5.metric("現在価格", "-")
-    ph6.metric("利率 (%)", "-")
-    ph7.metric("税引後利率 (%)", "-")
-
-    st.caption("※ 上のフォームで値を入れて『計算する』を押すと、最新の結果が表示されます。")
+st.subheader("📋 30営業日のデータ一覧")
+st.dataframe(result["df"], use_container_width=True)
