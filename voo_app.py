@@ -110,11 +110,13 @@ def get_voo_high_low_modes(yf_period: str, buy_price=None, manual_current_price=
 yf_period = PERIOD_OPTIONS[period_label]
 base_result = get_voo_high_low_modes(yf_period=yf_period, buy_price=None, manual_current_price=None)
 
-# ---- 1行目：最重要指標 ----
-r1c1, r1c2, r1c3 = st.columns(3)
+# ---- 1行目：最重要指標（2行目と列幅を合わせて上下を揃える：4列に統一） ----
+r1c1, r1c2, r1c3, r1c4 = st.columns([1, 1, 1, 1])
 r1c1.metric("高値（最頻）", base_result["most_frequent_high"])
 r1c2.metric("安値（最頻）", base_result["most_frequent_low"])
 r1c3.metric("値動き（率 %）", base_result["width_ratio_percent"])
+# 4列目はダミー（2行目の税引後利率に列位置を合わせるためのスペーサ）
+r1c4.write("")
 
 # ---- 2行目：試算（買値・現在値・利率・税引後利率） ----
 r2c1, r2c2, r2c3, r2c4 = st.columns(4)
