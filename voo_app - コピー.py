@@ -51,7 +51,6 @@ st.markdown(
 
 # ---- 期間選択（プルダウン） ----
 PERIOD_OPTIONS = {
-      "1日": "1d",
     "1週間": "7d",
     "1か月": "1mo",
     "3か月": "3mo",
@@ -204,94 +203,6 @@ r2c3.metric("利率", fpct(result["profit_percent"]), delta=fpct_delta(result["p
 r2c4.metric("税引後利率", fpct(result["tax_profit_percent"]), delta=fpct_delta(result["tax_profit_percent"]))
 
 st.caption("※ 税引後利率は米国ETFを特定口座で売買した場合（概算 20.315%）で計算しています。買値を入れると自動で計算されます。")
-
-# ---- 任意の売値・口数での試算コーナー ----
-st.subheader("🧮 売値と口数を変えた場合の試算")
-
-# 買値の初期値：入力されていればそれ、なければ現在価格
-default_buy = result["buy_price"] if result["buy_price"] is not None else result["current_price"]
-default_sell = result["current_price"]
-
-c1, c2, c3 = st.columns(3)
-with c1:
-    buy_price_sim = st.number_input(
-        "買値（1口あたり）",
-        min_value=0.0,
-        value=float(default_buy),
-        step=0.1,
-        format="%.2f",
-        key="sim_buy",
-    )
-with c2:
-    sell_price_sim = st.number_input(
-        "売値（想定・1口あたり）",
-        min_value=0.0,
-        value=float(default_sell),
-        step=0.1,
-        format="%.2f",
-        key="sim_sell",
-    )
-with c3:
-    units_sim = st.number_input(
-        "口数（保有数量）",
-        min_value=0,
-        value=1,
-        step=1,
-        key="sim_units",
-    )
-
-# 計算（元本・売却額・損益・税引後利率）
-cost = buy_price_sim * units_sim
-proceeds = sell_price_sim * units_sim
-profit = proceeds - cost
-
-profit_rate_sim = (profit / cost * 100) if cost > 0 else 0.0
-tax_rate = 0.20315  # 20.315%
-after_tax_profit = profit * (1 - tax_rate)
-after_tax_rate_sim = (after_tax_profit / cost * 100) if cost > 0 else 0.0
-
-# 計算（元本・売却額・損益・税引後利率）
-cost = buy_price_sim * units_sim
-proceeds = sell_price_sim * units_sim
-profit = proceeds - cost
-
-profit_rate_sim = (profit / cost * 100) if cost > 0 else 0.0
-tax_rate = 0.20315  # 20.315%
-after_tax_profit = profit * (1 - tax_rate)
-after_tax_rate_sim = (after_tax_profit / cost * 100) if cost > 0 else 0.0
-
-# 為替レート入力（1ドルあたりの円）
-fx_rate = st.number_input(
-    "為替レート（1ドル = ？円）",
-    min_value=0.0,
-    value=150.0,
-    step=0.1,
-    format="%.1f",
-    key="sim_fx",
-)
-
-after_tax_profit_jpy = after_tax_profit * fx_rate
-
-# --- 上段：金額をドーンと表示 ---
-m1, m2, m3, m4 = st.columns(4)
-with m1:
-    st.metric("投資元本", f"{cost:,.2f} ドル")
-with m2:
-    st.metric("損益（税引前）", f"{profit:,.2f} ドル")
-with m3:
-    st.metric("税引後損益", f"{after_tax_profit:,.2f} ドル")
-with m4:
-    st.metric("税引後損益（円換算）", f"{after_tax_profit_jpy:,.0f} 円")
-
-# --- 下段：率をまとめて表示 ---
-r1, r2 = st.columns(2)
-with r1:
-    st.metric("利益率（税引前）", f"{profit_rate_sim:.2f} ％")
-with r2:
-    st.metric("税引後利率", f"{after_tax_rate_sim:.2f} ％")
-
-st.caption("※ 為替レートは任意に変更できます。税率は概算 20.315% を使用しています。")
-
 
 # ---- 以下、詳細テーブル ----
 st.subheader("📉 値幅の割合が最も小さい日")
